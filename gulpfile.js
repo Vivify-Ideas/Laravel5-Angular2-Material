@@ -2,7 +2,16 @@ process.env.DISABLE_NOTIFIER = true;
 
 var elixir = require('laravel-elixir'),
     path = require('path'),
-    webpack = require('webpack');
+    webpack = require('webpack'),
+    fast = process.argv.indexOf('--fast') > -1,
+    webpackInput = {
+        vendor: 'vendor.ts',
+        app: 'main.ts'
+    };
+
+if (fast) {
+    delete webpackInput.vendor;
+}
 
 require('laravel-elixir-livereload');
 require('laravel-elixir-webpack-ex');
@@ -20,31 +29,20 @@ require('laravel-elixir-webpack-ex');
 
 elixir(function(mix) {
 
-    /**
-     * Sass
-     **/
-    mix.sass('app.scss');
+    if (!fast) {
+        mix.sass('app.scss');
+    }
 
     /**
      * Scripts webpack bundling and copying
      **/
-    mix.webpack({
-        vendor: 'vendor.ts',
-        app: 'main.ts'
-    }, {
+    mix.webpack(webpackInput, {
         debug: true,
         devtool: 'source-map',
         resolve: {
             extensions: ['', '.ts', '.js']
         },
         module: {
-            preLoaders: [
-                // {
-                //     test: /\.ts$/,
-                //     loader: 'tslint-loader',
-                //     exclude: /node_modules/
-                // }
-            ],
             loaders: [
                 {
                     test: /\.ts$/,
@@ -64,11 +62,6 @@ elixir(function(mix) {
                 '__metadata': 'typescript-metadata'
             }),
             new webpack.optimize.CommonsChunkPlugin({
-                name: 'vendor',
-                filename: 'vendor.js',
-                minChunks: Infinity
-            }),
-            new webpack.optimize.CommonsChunkPlugin({
                 name: 'app',
                 filename: 'app.js',
                 minChunks: 4,
@@ -76,15 +69,16 @@ elixir(function(mix) {
                     'app'
                 ]
             })
-        ],
-        tslint: {
-            emitErrors: false,
-            failOnHint: false,
-            resourcePath: 'resources/assets/typescript'
-        }
+        ].concat(fast ? [] : [
+            new webpack.optimize.CommonsChunkPlugin({
+                name: 'vendor',
+                filename: 'vendor.js',
+                minChunks: Infinity
+            })
+        ])
     }, 'public/js', 'resources/assets/typescript');
 
-    mix.version([ 'js/app.js', 'js/vendor.js', 'css/app.css' ]);
+    mix.version([ 'js/app.js' ].concat(fast ? [] : [ 'js/vendor.js', 'css/app.css' ]));
 
     /**
      * LiveReload
